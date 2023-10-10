@@ -11,13 +11,16 @@ namespace DependencyStore.WebApi.Controllers
   {
     private readonly ICustomerRepository _customerRepository;
     private readonly IDeliveryFeeService _deliveryFeeService;
+    private readonly IPromoCodeRepository _promoCodeRepository;
 
     public OrderController(
-      ICustomerRepository customerRepository, 
-      IDeliveryFeeService deliveryFeeService)
+      ICustomerRepository customerRepository,
+      IDeliveryFeeService deliveryFeeService,
+      IPromoCodeRepository promoCodeRepository)
     {
       _customerRepository = customerRepository;
       _deliveryFeeService = deliveryFeeService;
+      _promoCodeRepository = promoCodeRepository;
     }
 
     [Route("v1/orders")]
@@ -49,14 +52,10 @@ namespace DependencyStore.WebApi.Controllers
       }
 
       // #4 - Aplica o cupom de desconto
-      decimal discount = 0;
-      await using (var conn = new SqlConnection("CONN_STRING"))
-      {
-        const string query = "SELECT * FROM PROMO_CODES WHERE CODE=@code";
-        var promo = await conn.QueryFirstAsync<PromoCode>(query, new { code = promoCode });
-        if (promo.ExpireDate > DateTime.Now)
-          discount = promo.Value;
-      }
+      var cupom = await _promoCodeRepository.GetPromoCodeAsync(promoCode);
+      var discount = cupom?.ExpireDate > DateTime.UtcNow 
+        ? cupom?.Value ?? 0 
+        : 0;
 
       // #5 - Gera o pedido
       var order = new Order();
